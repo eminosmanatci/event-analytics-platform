@@ -14,7 +14,7 @@ def create_event(db: Session, event: EventCreate) -> EventResponse:
     db.add(db_event)
     db.commit()
     db.refresh(db_event)
-    return EventResponse.from_orm(db_event)  # ← from_orm kullan!
+    return EventResponse.from_orm(db_event) 
 
 
 def get_events(
@@ -32,11 +32,11 @@ def get_events(
         query = query.filter(Event.user_id == user_id)
     
     events = query.order_by(Event.timestamp.desc()).offset(skip).limit(limit).all()
-    return [EventResponse.from_orm(event) for event in events]  # ← from_orm kullan!
+    return [EventResponse.from_orm(event) for event in events]  
 
 
 def get_event_by_id(db: Session, event_id: int) -> Optional[EventResponse]:
     db_event = db.query(Event).filter(Event.id == event_id).first()
     if db_event:
-        return EventResponse.from_orm(db_event)  # ← from_orm kullan!
+        return EventResponse.from_orm(db_event)  
     return None

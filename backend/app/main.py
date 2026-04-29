@@ -2,11 +2,9 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import settings
-from app.core.database import engine, Base
-from app.routers import events, analytics  # ← analytics burada olmalı!
+from app.core.database import engine, Base  
+from app.routers import events, analytics
 
-# Veritabanı tablolarını oluştur (eğer yoksa)
-Base.metadata.create_all(bind=engine)
 
 app = FastAPI(
     title=settings.APP_NAME,
@@ -27,7 +25,8 @@ app.add_middleware(
 
 # Router'ları ekle
 app.include_router(events.router, prefix=settings.API_V1_PREFIX)
-app.include_router(analytics.router, prefix=settings.API_V1_PREFIX) 
+app.include_router(analytics.router, prefix=settings.API_V1_PREFIX)
+
 
 @app.get("/")
 def root():
@@ -36,6 +35,7 @@ def root():
         "version": "1.0.0",
         "docs": "/docs"
     }
+
 
 @app.get("/health")
 def health_check():

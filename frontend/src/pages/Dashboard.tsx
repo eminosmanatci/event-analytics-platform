@@ -9,9 +9,7 @@ import {
   Clock,
   Zap,
   Search,
-  Filter,
   ChevronLeft,
-  ChevronRight,
   LogOut,
   BarChart3,
 } from 'lucide-react';
@@ -19,7 +17,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
 import { analyticsApi, eventApi } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom'; // Eklendi
 import { StatCard } from '../components/StatCard';
 import { EventsOverTimeChart, EventTypesChart } from '../components/EventChart';
 import { ThemeToggle } from '../components/ThemeToggle';
@@ -39,6 +37,7 @@ const ITEMS_PER_PAGE = 10;
 export default function Dashboard() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation(); // Mevcut yolu izlemek için eklendi
 
   const [stats, setStats] = useState({
     totalEvents: 0,
@@ -88,7 +87,7 @@ export default function Dashboard() {
 
   useEffect(() => {
     fetchData();
-    const interval = setInterval(() => fetchData(false), 30000); // 30 saniye
+    const interval = setInterval(() => fetchData(false), 30000);
     return () => clearInterval(interval);
   }, [fetchData]);
 
@@ -98,13 +97,11 @@ export default function Dashboard() {
     toast.info('Logged out successfully');
   };
 
-  // Filtreleme
   const filteredEvents = recentEvents.filter(event =>
     event.event_type.toLowerCase().includes(searchQuery.toLowerCase()) ||
     event.user_id.toString().includes(searchQuery)
   );
 
-  // Pagination
   const totalPages = Math.ceil(filteredEvents.length / ITEMS_PER_PAGE);
   const paginatedEvents = filteredEvents.slice(
     (currentPage - 1) * ITEMS_PER_PAGE,
@@ -146,9 +143,20 @@ export default function Dashboard() {
                 </div>
               </div>
 
+              {/* Güncellenmiş Navigasyon Kısmı */}
               <nav className="space-y-1">
-                <SidebarItem icon={<BarChart3 className="w-4 h-4" />} label="Dashboard" active />
-                <SidebarItem icon={<MousePointer className="w-4 h-4" />} label="Events" />
+                <SidebarItem 
+                  icon={<BarChart3 className="w-4 h-4" />} 
+                  label="Dashboard" 
+                  path="/dashboard" 
+                  active={location.pathname === '/dashboard'} 
+                />
+                <SidebarItem 
+                  icon={<MousePointer className="w-4 h-4" />} 
+                  label="Events" 
+                  path="/events" 
+                  active={location.pathname === '/events'} 
+                />
                 <SidebarItem icon={<Users className="w-4 h-4" />} label="Users" />
                 <SidebarItem icon={<Zap className="w-4 h-4" />} label="Analytics" />
                 <SidebarItem icon={<Clock className="w-4 h-4" />} label="Real-time" />
@@ -174,7 +182,6 @@ export default function Dashboard() {
 
       {/* Main Content */}
       <div className={cn("flex-1 transition-all duration-300", sidebarOpen ? "ml-[260px]" : "ml-0")}>
-        {/* Top Bar */}
         <header className="sticky top-0 z-30 glass border-b border-border">
           <div className="flex items-center justify-between px-6 py-3">
             <div className="flex items-center gap-4">
@@ -189,7 +196,6 @@ export default function Dashboard() {
 
             <div className="flex items-center gap-3">
               <ThemeToggle />
-              
               <button
                 onClick={() => fetchData(true)}
                 disabled={refreshing}
@@ -201,7 +207,6 @@ export default function Dashboard() {
                 <RefreshCw className={cn("w-4 h-4", refreshing && "animate-spin")} />
                 <span className="text-sm font-medium">Refresh</span>
               </button>
-
               <button
                 onClick={handleLogout}
                 className="flex items-center gap-2 px-4 py-2 rounded-lg bg-destructive/10 text-destructive hover:bg-destructive/20 transition-colors"
@@ -214,94 +219,39 @@ export default function Dashboard() {
         </header>
 
         <main className="p-6 space-y-6 max-w-[1600px]">
-          {/* Stats Grid */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             {loading ? (
-              <>
-                <StatCardSkeleton />
-                <StatCardSkeleton />
-                <StatCardSkeleton />
-                <StatCardSkeleton />
-              </>
+              <><StatCardSkeleton /><StatCardSkeleton /><StatCardSkeleton /><StatCardSkeleton /></>
             ) : (
               <>
-                <StatCard
-                  title="Total Events"
-                  value={stats.totalEvents}
-                  icon={<MousePointer className="w-5 h-5" />}
-                  trend={12}
-                  trendLabel="vs last month"
-                  color="blue"
-                  delay={0}
-                />
-                <StatCard
-                  title="Active Users"
-                  value={stats.activeUsers}
-                  icon={<Users className="w-5 h-5" />}
-                  trend={8}
-                  trendLabel="vs last month"
-                  color="green"
-                  delay={0.1}
-                />
-                <StatCard
-                  title="Event Types"
-                  value={stats.eventTypes}
-                  icon={<Calendar className="w-5 h-5" />}
-                  color="purple"
-                  delay={0.2}
-                />
-                <StatCard
-                  title="Today's Events"
-                  value={stats.todayEvents}
-                  icon={<Zap className="w-5 h-5" />}
-                  trend={-3}
-                  trendLabel="vs yesterday"
-                  color="orange"
-                  delay={0.3}
-                />
+                <StatCard title="Total Events" value={stats.totalEvents} icon={<MousePointer className="w-5 h-5" />} trend={12} trendLabel="vs last month" color="blue" delay={0} />
+                <StatCard title="Active Users" value={stats.activeUsers} icon={<Users className="w-5 h-5" />} trend={8} trendLabel="vs last month" color="green" delay={0.1} />
+                <StatCard title="Event Types" value={stats.eventTypes} icon={<Calendar className="w-5 h-5" />} color="purple" delay={0.2} />
+                <StatCard title="Today's Events" value={stats.todayEvents} icon={<Zap className="w-5 h-5" />} trend={-3} trendLabel="vs yesterday" color="orange" delay={0.3} />
               </>
             )}
           </div>
 
-          {/* Charts */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.4 }}
-              className="bg-card rounded-xl border border-border p-6 shadow-sm"
-            >
+            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }} className="bg-card rounded-xl border border-border p-6 shadow-sm">
               <h3 className="text-lg font-semibold text-foreground mb-4">Events Over Time</h3>
               <EventsOverTimeChart />
             </motion.div>
-
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.5 }}
-              className="bg-card rounded-xl border border-border p-6 shadow-sm"
-            >
+            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.5 }} className="bg-card rounded-xl border border-border p-6 shadow-sm">
               <h3 className="text-lg font-semibold text-foreground mb-4">Event Types Distribution</h3>
               <EventTypesChart />
             </motion.div>
           </div>
 
-          {/* Events Table */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.6 }}
-            className="bg-card rounded-xl border border-border shadow-sm overflow-hidden"
-          >
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.6 }} className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
             <div className="p-6 border-b border-border">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
                   <h3 className="text-lg font-semibold text-foreground">Recent Events</h3>
                   <p className="text-sm text-muted-foreground mt-1">
-                    Auto-refreshes every 30 seconds • {filteredEvents.length} total events
+                    Auto-refreshes every 30 seconds • {filteredEvents.length} total events • Sayfa {currentPage} / {totalPages}
                   </p>
                 </div>
-                
                 <div className="flex items-center gap-3">
                   <div className="relative">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
@@ -309,117 +259,56 @@ export default function Dashboard() {
                       type="text"
                       placeholder="Search events..."
                       value={searchQuery}
-                      onChange={(e) => {
-                        setSearchQuery(e.target.value);
-                        setCurrentPage(1);
-                      }}
+                      onChange={(e) => { setSearchQuery(e.target.value); setCurrentPage(1); }}
                       className="pl-10 pr-4 py-2 rounded-lg border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 w-full sm:w-64"
                     />
                   </div>
-                  <button className="p-2 rounded-lg border border-border hover:bg-muted transition-colors">
-                    <Filter className="w-4 h-4" />
-                  </button>
                 </div>
               </div>
             </div>
 
-            {loading ? (
-              <TableSkeleton />
-            ) : (
-              <>
-                <div className="overflow-x-auto">
-                  <table className="w-full">
-                    <thead>
-                      <tr className="border-b border-border bg-muted/50">
-                        <th className="px-6 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">ID</th>
-                        <th className="px-6 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">Event Type</th>
-                        <th className="px-6 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">User</th>
-                        <th className="px-6 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">Timestamp</th>
-                        <th className="px-6 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-border">
-                      <AnimatePresence>
-                        {paginatedEvents.map((event, index) => (
-                          <motion.tr
-                            key={event.id}
-                            initial={{ opacity: 0, x: -20 }}
-                            animate={{ opacity: 1, x: 0 }}
-                            exit={{ opacity: 0, x: 20 }}
-                            transition={{ delay: index * 0.05 }}
-                            className="hover:bg-muted/50 transition-colors group"
-                          >
-                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-foreground">
-                              #{event.id}
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap">
-                              <span className={cn(
-                                "inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border",
-                                getEventTypeColor(event.event_type)
-                              )}>
-                                {event.event_type}
-                              </span>
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-muted-foreground">
-                              <div className="flex items-center gap-2">
-                                <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center text-xs font-semibold text-primary">
-                                  {event.user_id}
-                                </div>
-                                <span>User #{event.user_id}</span>
-                              </div>
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-muted-foreground">
-                              <div className="flex items-center gap-1.5">
-                                <Clock className="w-3.5 h-3.5" />
-                                {new Date(event.timestamp).toLocaleString('tr-TR')}
-                              </div>
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap">
-                              <button
-                                onClick={() => setSelectedEvent(event)}
-                                className="flex items-center gap-1.5 text-sm text-primary hover:text-primary/80 font-medium opacity-0 group-hover:opacity-100 transition-opacity"
-                              >
-                                <Eye className="w-4 h-4" />
-                                View
-                              </button>
-                            </td>
-                          </motion.tr>
-                        ))}
-                      </AnimatePresence>
-                    </tbody>
-                  </table>
-                </div>
-
-                {/* Pagination */}
-                {totalPages > 1 && (
-                  <div className="flex items-center justify-between px-6 py-4 border-t border-border">
-                    <p className="text-sm text-muted-foreground">
-                      Showing {(currentPage - 1) * ITEMS_PER_PAGE + 1} to{' '}
-                      {Math.min(currentPage * ITEMS_PER_PAGE, filteredEvents.length)} of{' '}
-                      {filteredEvents.length} events
-                    </p>
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                        disabled={currentPage === 1}
-                        className="p-2 rounded-lg border border-border hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                      >
-                        <ChevronLeft className="w-4 h-4" />
-                      </button>
-                      <span className="text-sm font-medium text-foreground px-3">
-                        {currentPage} / {totalPages}
-                      </span>
-                      <button
-                        onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                        disabled={currentPage === totalPages}
-                        className="p-2 rounded-lg border border-border hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                      >
-                        <ChevronRight className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </>
+            {loading ? <TableSkeleton /> : (
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b border-border bg-muted/50">
+                      <th className="px-6 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">ID</th>
+                      <th className="px-6 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">Event Type</th>
+                      <th className="px-6 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">User</th>
+                      <th className="px-6 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">Timestamp</th>
+                      <th className="px-6 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border">
+                    <AnimatePresence>
+                      {paginatedEvents.map((event, index) => (
+                        <motion.tr key={event.id} initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }} transition={{ delay: index * 0.05 }} className="hover:bg-muted/50 transition-colors group">
+                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-foreground">#{event.id}</td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <span className={cn("inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border", getEventTypeColor(event.event_type))}>
+                              {event.event_type}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-muted-foreground">
+                            <div className="flex items-center gap-2">
+                              <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center text-xs font-semibold text-primary">{event.user_id}</div>
+                              <span>User #{event.user_id}</span>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-muted-foreground">
+                            <div className="flex items-center gap-1.5"><Clock className="w-3.5 h-3.5" />{new Date(event.timestamp).toLocaleString('tr-TR')}</div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <button onClick={() => setSelectedEvent(event)} className="flex items-center gap-1.5 text-sm text-primary hover:text-primary/80 font-medium opacity-0 group-hover:opacity-100 transition-opacity">
+                              <Eye className="w-4 h-4" /> View
+                            </button>
+                          </td>
+                        </motion.tr>
+                      ))}
+                    </AnimatePresence>
+                  </tbody>
+                </table>
+              </div>
             )}
           </motion.div>
         </main>
@@ -429,69 +318,35 @@ export default function Dashboard() {
       <AnimatePresence>
         {selectedEvent && (
           <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
             className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4"
             onClick={() => setSelectedEvent(null)}
           >
             <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: 20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 20 }}
               onClick={e => e.stopPropagation()}
               className="bg-card rounded-2xl shadow-2xl max-w-lg w-full border border-border overflow-hidden"
             >
               <div className="p-6 border-b border-border">
                 <div className="flex items-center justify-between">
                   <h3 className="text-lg font-semibold text-foreground">Event Details</h3>
-                  <button
-                    onClick={() => setSelectedEvent(null)}
-                    className="p-1 rounded-lg hover:bg-muted transition-colors"
-                  >
-                    ✕
-                  </button>
+                  <button onClick={() => setSelectedEvent(null)} className="p-1 rounded-lg hover:bg-muted transition-colors">✕</button>
                 </div>
               </div>
-              
               <div className="p-6 space-y-4">
                 <DetailRow label="ID" value={`#${selectedEvent.id}`} />
-                <DetailRow 
-                  label="Event Type" 
-                  value={
-                    <span className={cn(
-                      "inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border",
-                      getEventTypeColor(selectedEvent.event_type)
-                    )}>
-                      {selectedEvent.event_type}
-                    </span>
-                  } 
-                />
+                <DetailRow label="Event Type" value={<span className={cn("inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border", getEventTypeColor(selectedEvent.event_type))}>{selectedEvent.event_type}</span>} />
                 <DetailRow label="User ID" value={selectedEvent.user_id} />
-                <DetailRow 
-                  label="Timestamp" 
-                  value={new Date(selectedEvent.timestamp).toLocaleString('tr-TR', {
-                    dateStyle: 'full',
-                    timeStyle: 'medium',
-                  })} 
-                />
+                <DetailRow label="Timestamp" value={new Date(selectedEvent.timestamp).toLocaleString('tr-TR', { dateStyle: 'full', timeStyle: 'medium' })} />
                 <div>
                   <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Metadata</label>
                   <div className="mt-2 p-4 bg-muted rounded-xl border border-border">
-                    <pre className="text-xs text-foreground overflow-auto max-h-60 font-mono">
-                      {JSON.stringify(selectedEvent.metadata, null, 2)}
-                    </pre>
+                    <pre className="text-xs text-foreground overflow-auto max-h-60 font-mono">{JSON.stringify(selectedEvent.metadata, null, 2)}</pre>
                   </div>
                 </div>
               </div>
-              
               <div className="p-6 border-t border-border bg-muted/30">
-                <button
-                  onClick={() => setSelectedEvent(null)}
-                  className="w-full py-2.5 bg-primary text-primary-foreground rounded-xl hover:bg-primary/90 transition-colors font-medium"
-                >
-                  Close
-                </button>
+                <button onClick={() => setSelectedEvent(null)} className="w-full py-2.5 bg-primary text-primary-foreground rounded-xl hover:bg-primary/90 transition-colors font-medium">Close</button>
               </div>
             </motion.div>
           </motion.div>
@@ -501,10 +356,23 @@ export default function Dashboard() {
   );
 }
 
-// Helper Components
-function SidebarItem({ icon, label, active = false }: { icon: React.ReactNode; label: string; active?: boolean }) {
+// SidebarItem Bileşeni
+function SidebarItem({ 
+  icon, 
+  label, 
+  path, 
+  active = false 
+}: { 
+  icon: React.ReactNode; 
+  label: string; 
+  path?: string;
+  active?: boolean;
+}) {
+  const navigate = useNavigate();
+  
   return (
     <button
+      onClick={() => path && navigate(path)}
       className={cn(
         "w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all",
         active
@@ -521,9 +389,7 @@ function SidebarItem({ icon, label, active = false }: { icon: React.ReactNode; l
 function DetailRow({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div className="flex items-start justify-between gap-4">
-      <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider shrink-0">
-        {label}
-      </label>
+      <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider shrink-0">{label}</label>
       <div className="text-sm text-foreground font-medium text-right">{value}</div>
     </div>
   );

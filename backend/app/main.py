@@ -2,9 +2,8 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import settings
-from app.core.database import engine, Base  
-from app.routers import events, analytics
-
+from app.core.database import engine, Base
+from app.routers import events, analytics, auth  # auth eklendi
 
 app = FastAPI(
     title=settings.APP_NAME,
@@ -14,16 +13,17 @@ app = FastAPI(
     redoc_url="/redoc"
 )
 
-# CORS ayarları
+# CORS ayarları - Frontend'den erişim için
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],  # Boşluk kaldırıldı
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
 # Router'ları ekle
+app.include_router(auth.router, prefix=settings.API_V1_PREFIX)  # Auth router eklendi
 app.include_router(events.router, prefix=settings.API_V1_PREFIX)
 app.include_router(analytics.router, prefix=settings.API_V1_PREFIX)
 

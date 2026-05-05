@@ -83,7 +83,7 @@ export default function Analytics() {
                 dataKey="count"
                 nameKey="event_type"
               >
-                {eventTypes.map((entry, index) => (
+                {eventTypes.map((_entry, index) => (
                   <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                 ))}
               </Pie>

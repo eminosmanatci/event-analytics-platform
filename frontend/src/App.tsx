@@ -6,17 +6,11 @@ import Login from './pages/Login';
 import Register from './pages/Register';
 import Dashboard from './pages/Dashboard';
 import Events from './pages/Events';
+import Users from './pages/Users';
+import Analytics from './pages/Analytics';
+import Realtime from './pages/Realtime';
 
-// Layout wrapper for protected routes with sidebar
-function ProtectedLayout({ children }: { children: React.ReactNode }) {
-  return (
-    <ProtectedRoute>
-      {children}
-    </ProtectedRoute>
-  );
-}
-
-function App() {
+const App = () => {
   return (
     <AuthProvider>
       <ToastProvider />
@@ -27,17 +21,41 @@ function App() {
           <Route
             path="/dashboard"
             element={
-              <ProtectedLayout>
+              <ProtectedRoute>
                 <Dashboard />
-              </ProtectedLayout>
+              </ProtectedRoute>
             }
           />
           <Route
             path="/events"
             element={
-              <ProtectedLayout>
+              <ProtectedRoute>
                 <Events />
-              </ProtectedLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/users"
+            element={
+              <ProtectedRoute>
+                <Users />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/analytics"
+            element={
+              <ProtectedRoute>
+                <Analytics />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/realtime"
+            element={
+              <ProtectedRoute>
+                <Realtime />
+              </ProtectedRoute>
             }
           />
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
@@ -45,6 +63,6 @@ function App() {
       </Router>
     </AuthProvider>
   );
-}
+};
 
 export default App;

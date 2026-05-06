@@ -7,14 +7,14 @@ services:
     container_name: event-analytics-db
     environment:
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
+      POSTGRES_PASSWORD: postgres  # Buradaki şifre ile backend'deki aynı olmalı
       POSTGRES_DB: event_analytics
     volumes:
       - postgres_data:/var/lib/postgresql/data
     ports:
       - "5432:5432"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      test: ["CMD-SHELL", "pg_isready -U postgres -d event_analytics"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -26,18 +26,15 @@ services:
     environment:
       DATABASE_URL: postgresql://postgres:postgres@db:5432/event_analytics
       APP_NAME: Event Analytics Platform
-      DEBUG: "True"  # Geliştirme aşamasında True olması iyidir
+      DEBUG: "True"
       API_V1_PREFIX: /api/v1
     volumes:
-      - ./backend:/app  # Kod değişikliğini anında içeride görmek için
+      - ./backend/app:/app/app
     ports:
-      - "8000:8000"
+      - "8000:8000"  # Dışarıdan erişim için kritik
     depends_on:
       db:
         condition: service_healthy
-    command: >
-      sh -c "alembic upgrade head &&
-             uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
 
   # React Frontend (Vite)
   frontend:
@@ -46,13 +43,13 @@ services:
     environment:
       - VITE_API_URL=http://localhost:8000/api/v1
     volumes:
-      - ./frontend:/app           # Kod değişikliği için
-      - /app/node_modules        # Modüllerin konteyner içinde kalması için (önemli!)
+      - ./frontend:/app
+      - /app/node_modules
     ports:
-      - "5173:5173"              # Vite varsayılan portu
+      - "5173:5173"
     depends_on:
       - backend
-    command: npm run dev
+    command: npm run dev -- --host
 
 volumes:
   postgres_data:

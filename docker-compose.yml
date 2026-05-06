@@ -26,8 +26,10 @@ services:
     environment:
       DATABASE_URL: postgresql://postgres:postgres@db:5432/event_analytics
       APP_NAME: Event Analytics Platform
-      DEBUG: "False"
+      DEBUG: "True"  # Geliştirme aşamasında True olması iyidir
       API_V1_PREFIX: /api/v1
+    volumes:
+      - ./backend:/app  # Kod değişikliğini anında içeride görmek için
     ports:
       - "8000:8000"
     depends_on:
@@ -35,16 +37,22 @@ services:
         condition: service_healthy
     command: >
       sh -c "alembic upgrade head &&
-             uvicorn app.main:app --host 0.0.0.0 --port 8000"
+             uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
 
-  # React Frontend
+  # React Frontend (Vite)
   frontend:
     build: ./frontend
     container_name: event-analytics-frontend
+    environment:
+      - VITE_API_URL=http://localhost:8000/api/v1
+    volumes:
+      - ./frontend:/app           # Kod değişikliği için
+      - /app/node_modules        # Modüllerin konteyner içinde kalması için (önemli!)
     ports:
-      - "80:80"
+      - "5173:5173"              # Vite varsayılan portu
     depends_on:
       - backend
+    command: npm run dev
 
 volumes:
   postgres_data:

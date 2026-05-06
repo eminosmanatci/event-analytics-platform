@@ -1,23 +1,18 @@
-# Build aşaması
-FROM node:18-alpine AS builder
+# Node.js imajını kullanıyoruz
+FROM node:18-alpine
 
+# Konteyner içinde çalışacağımız klasör
 WORKDIR /app
 
+# Bağımlılıkları kopyala ve yükle
 COPY package.json package-lock.json ./
-RUN npm ci
+RUN npm install
 
+# Proje dosyalarının geri kalanını kopyala
 COPY . .
-RUN npm run build
 
-# Production aşaması (Nginx ile serve)
-FROM nginx:alpine
+# Vite'ın varsayılan portunu dışarı aç
+EXPOSE 5173
 
-# Build edilmiş dosyaları kopyala
-COPY --from=builder /app/dist /usr/share/nginx/html
-
-# Nginx config
-COPY nginx.conf /etc/nginx/conf.d/default.conf
-
-EXPOSE 80
-
-CMD ["nginx", "-g", "daemon off;"]
+# Uygulamayı geliştirme modunda (Vite) başlat
+CMD ["npm", "run", "dev"]

@@ -11,7 +11,8 @@ sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 
 from app.core.database import Base
 from app.core.config import settings
-from app.models.event import Event  
+from app.models.event import Event
+from app.models.user import User  # ← EKLENDİ!
 
 
 # this is the Alembic Config object
@@ -22,7 +23,7 @@ config.set_main_option("sqlalchemy.url", settings.DATABASE_URL)
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-target_metadata = Base.metadata 
+target_metadata = Base.metadata
 
 
 def run_migrations_offline() -> None:

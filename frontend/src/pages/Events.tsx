@@ -90,6 +90,19 @@ export default function Events() {
     }
   };
 
+  // Eksik olan silme fonksiyonu eklendi
+  const handleDeleteEvent = async (id: number) => {
+    if (!confirm('Are you sure you want to delete this event?')) return;
+    try {
+      // eventApi içinde delete metodunuzun tanımlı olduğunu varsayıyoruz
+      await eventApi.delete(id);
+      toast.success('Event deleted successfully');
+      fetchEvents();
+    } catch (err: any) {
+      toast.error(err.response?.data?.detail || 'Failed to delete event');
+    }
+  };
+
   const filteredEvents = events.filter(event =>
     event.event_type.toLowerCase().includes(searchQuery.toLowerCase()) ||
     event.user_id.toString().includes(searchQuery)
@@ -294,6 +307,7 @@ export default function Events() {
                                 <Eye className="w-4 h-4" />
                               </button>
                               <button
+                                onClick={() => handleDeleteEvent(event.id)}
                                 className="p-1.5 rounded-lg text-destructive hover:bg-destructive/10 transition-colors"
                               >
                                 <Trash2 className="w-4 h-4" />

@@ -48,3 +48,18 @@ def get_event(
     if not event:
         raise HTTPException(status_code=404, detail="Event not found")
     return event
+
+# 🔒 PRIVATE: Event silme
+@router.delete("/{event_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_event(
+    event_id: int,
+    db: Session = Depends(get_db),
+    current_user = Depends(get_current_user)  # Auth zorunlu
+):
+    """Delete an event - requires authentication"""
+    from app.services.event_service import delete_event as service_delete_event
+    
+    success = service_delete_event(db, event_id)
+    if not success:
+        raise HTTPException(status_code=404, detail="Event not found")
+    return None

@@ -36,3 +36,13 @@ def get_events(
 
 def get_event_by_id(db: Session, event_id: int) -> Optional[Event]:
     return db.query(Event).filter(Event.id == event_id).first()
+
+def delete_event(db: Session, event_id: int) -> bool:
+    """Delete an event by ID. Returns True if deleted, False if not found."""
+    db_event = db.query(Event).filter(Event.id == event_id).first()
+    if not db_event:
+        return False
+    
+    db.delete(db_event)
+    db.commit()
+    return True

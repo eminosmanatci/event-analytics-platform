@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Send, CheckCircle, User } from 'lucide-react';
-import { eventApi } from '../lib/api';
+import { eventApi, api } from '../lib/api'; // ← NAMED IMPORT!
 
 interface UserData {
   id: number;
@@ -23,18 +23,25 @@ export default function CreateEvent() {
     const fetchUser = async () => {
       try {
         const token = localStorage.getItem('token');
-        if (!token) return;
+        console.log('Token:', token);
 
-        const response = await fetch('http://localhost:8000/api/v1/auth/me', {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-
-        if (response.ok) {
-          const userData = await response.json();
-          setCurrentUser(userData);
+        if (!token) {
+          console.log('No token');
+          return;
         }
-      } catch {
-        // Kullanıcı login değilse veya hata varsa, anonim event
+
+        console.log('Fetching user...');
+        const response = await api.get('/auth/me');
+        console.log('User data:', response.data);
+
+        if (response.data) {
+          setCurrentUser(response.data);
+        }
+      } catch (err: any) {
+        console.error('Error:', err.message);
+        if (err.response?.status === 401) {
+          localStorage.removeItem('token');
+        }
         setCurrentUser(null);
       }
     };
@@ -56,17 +63,17 @@ export default function CreateEvent() {
         metadata = {};
       }
 
-      // Payload oluştur
       const payload: any = {
         event_type: formData.event_type,
         metadata,
       };
 
-      // Eğer kullanıcı login olmuşsa user_id ekle
       if (currentUser?.id) {
         payload.user_id = currentUser.id;
+        console.log('Adding user_id:', currentUser.id);
       }
 
+      console.log('Payload:', payload);
       await eventApi.create(payload);
 
       setSuccess(true);
@@ -85,7 +92,7 @@ export default function CreateEvent() {
         {currentUser && (
           <div className="flex items-center gap-2 px-3 py-1.5 bg-blue-50 text-blue-700 rounded-full text-sm">
             <User className="w-4 h-4" />
-            <span>@{currentUser.username}</span>
+            <span>@{currentUser.username} (#{currentUser.id})</span>
           </div>
         )}
       </div>
@@ -108,7 +115,6 @@ export default function CreateEvent() {
         </div>
       )}
 
-      {/* Anonim uyarısı */}
       {!currentUser && (
         <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg text-amber-700 text-sm">
           You are not logged in. Event will be created anonymously.
@@ -124,7 +130,7 @@ export default function CreateEvent() {
             type="text"
             value={formData.event_type}
             onChange={(e) => setFormData({ ...formData, event_type: e.target.value })}
-            placeholder="e.g., user_login, task_created"
+            placeholder="e.g., user_login, button_click"
             className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none transition-all"
             required
           />
@@ -149,7 +155,7 @@ export default function CreateEvent() {
           className="w-full flex items-center justify-center gap-2 bg-primary-600 text-white py-3 rounded-lg hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium"
         >
           <Send className="w-4 h-4" />
-          {loading ? 'Creating...' : currentUser ? 'Send Event (Authenticated)' : 'Send Event (Anonymous)'}
+          {loading ? 'Creating...' : currentUser ? `Send Event (as @${currentUser.username})` : 'Send Event (Anonymous)'}
         </button>
       </form>
     </div>

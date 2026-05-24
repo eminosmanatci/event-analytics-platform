@@ -6,18 +6,18 @@ from app.core.database import get_db
 from app.core.config import settings
 from app.core.security import create_access_token, decode_token
 from app.schemas.user import UserCreate, UserResponse, Token
-from app.services.auth_service import create_user, authenticate_user, get_user_by_username
 from app.services.auth_service import create_user, authenticate_user, get_user_by_username, get_user_by_email
+from app.models.user import User  # ← Sadece bir kez import edildi
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl=f"{settings.API_V1_PREFIX}/auth/login")
 
 
-async def get_current_user(
+def get_current_user(
     token: str = Depends(oauth2_scheme),
     db: Session = Depends(get_db)
-) -> UserResponse:
+) -> User:  # ← DOĞRU OLAN: SQLAlchemy modeli döndürülüyor
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",
@@ -36,18 +36,16 @@ async def get_current_user(
     if user is None:
         raise credentials_exception
     
-    return user
+    return user  # ← SQLAlchemy User modeli
 
 
 @router.post("/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
 def register(user: UserCreate, db: Session = Depends(get_db)):
-    # Kullanıcı adı kontrolü
     if get_user_by_username(db, user.username):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Username already registered"
         )
-    # Email kontrolü
     if get_user_by_email(db, user.email):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -79,5 +77,5 @@ def login(
 
 
 @router.get("/me", response_model=UserResponse)
-def read_current_user(current_user: UserResponse = Depends(get_current_user)):
-    return current_user
+def read_current_user(current_user: User = Depends(get_current_user)):  # ← DOĞRU OLAN: Type hint User
+    return current_user  # FastAPI response_model ile UserResponse'a çevirir

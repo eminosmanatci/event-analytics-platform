@@ -13,33 +13,41 @@ export default function CreateEvent() {
   const [error, setError] = useState('');
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    setError('');
-    setSuccess(false);
+  e.preventDefault();
+  setLoading(true);
+  setError('');
+  setSuccess(false);
 
-    try {
-      let metadata = {};
-      try {
-        metadata = JSON.parse(formData.metadata);
-      } catch {
-        metadata = {};
-      }
-
-      await eventApi.create({
-        event_type: formData.event_type,
-        user_id: parseInt(formData.user_id),
-        metadata,
-      });
-
-      setSuccess(true);
-      setFormData({ event_type: '', user_id: '', metadata: '{}' });
-    } catch (err: any) {
-      setError(err.response?.data?.detail || 'Something went wrong');
-    } finally {
+  try {
+    // VALIDATION: user_id boş veya 0 ise hata ver
+    const userId = parseInt(formData.user_id);
+    if (!formData.user_id || isNaN(userId) || userId <= 0) {
+      setError('User ID must be a positive number');
       setLoading(false);
+      return;
     }
-  };
+
+    let metadata = {};
+    try {
+      metadata = JSON.parse(formData.metadata);
+    } catch {
+      metadata = {};
+    }
+
+    await eventApi.create({
+      event_type: formData.event_type,
+      user_id: userId,        // ← Artık garanti pozitif integer
+      metadata,
+    });
+
+    setSuccess(true);
+    setFormData({ event_type: '', user_id: '', metadata: '{}' });
+  } catch (err: any) {
+    setError(err.response?.data?.detail || 'Something went wrong');
+  } finally {
+    setLoading(false);
+  }
+};
 
   return (
     <div className="max-w-2xl">

@@ -5,16 +5,16 @@ from app.models.event import Event
 from app.schemas.event import EventCreate, EventResponse
 
 
-def create_event(db: Session, event: EventCreate) -> EventResponse:
+def create_event(db: Session, event: EventCreate) -> Event:
     db_event = Event(
         user_id=event.user_id,
         event_type=event.event_type,
-        metadata_=event.metadata
+        metadata_=event.metadata  # ← modelde metadata_, schema'da metadata
     )
     db.add(db_event)
     db.commit()
     db.refresh(db_event)
-    return EventResponse.from_orm(db_event) 
+    return db_event  # ← direkt model döndür, router'da response_model halleder
 
 
 def get_events(
@@ -23,7 +23,7 @@ def get_events(
     limit: int = 100,
     event_type: Optional[str] = None,
     user_id: Optional[int] = None
-) -> List[EventResponse]:
+) -> List[Event]:
     query = db.query(Event)
     
     if event_type:
@@ -31,12 +31,8 @@ def get_events(
     if user_id:
         query = query.filter(Event.user_id == user_id)
     
-    events = query.order_by(Event.timestamp.desc()).offset(skip).limit(limit).all()
-    return [EventResponse.from_orm(event) for event in events]  
+    return query.order_by(Event.timestamp.desc()).offset(skip).limit(limit).all()
 
 
-def get_event_by_id(db: Session, event_id: int) -> Optional[EventResponse]:
-    db_event = db.query(Event).filter(Event.id == event_id).first()
-    if db_event:
-        return EventResponse.from_orm(db_event)  
-    return None
+def get_event_by_id(db: Session, event_id: int) -> Optional[Event]:
+    return db.query(Event).filter(Event.id == event_id).first()

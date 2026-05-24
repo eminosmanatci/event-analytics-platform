@@ -1,68 +1,117 @@
-import { useState } from 'react';
-import { Send, CheckCircle } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Send, CheckCircle, User } from 'lucide-react';
 import { eventApi } from '../lib/api';
+
+interface UserData {
+  id: number;
+  username: string;
+  email: string;
+}
 
 export default function CreateEvent() {
   const [formData, setFormData] = useState({
     event_type: '',
-    user_id: '',
     metadata: '{}',
   });
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState('');
+  const [currentUser, setCurrentUser] = useState<UserData | null>(null);
+
+  // Login olmuş kullanıcının bilgilerini al
+  useEffect(() => {
+    const fetchUser = async () => {
+      try {
+        const token = localStorage.getItem('token');
+        if (!token) return;
+
+        const response = await fetch('http://localhost:8000/api/v1/auth/me', {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+
+        if (response.ok) {
+          const userData = await response.json();
+          setCurrentUser(userData);
+        }
+      } catch {
+        // Kullanıcı login değilse veya hata varsa, anonim event
+        setCurrentUser(null);
+      }
+    };
+
+    fetchUser();
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
-  e.preventDefault();
-  setLoading(true);
-  setError('');
-  setSuccess(false);
+    e.preventDefault();
+    setLoading(true);
+    setError('');
+    setSuccess(false);
 
-  try {
-    // VALIDATION: user_id boş veya 0 ise hata ver
-    const userId = parseInt(formData.user_id);
-    if (!formData.user_id || isNaN(userId) || userId <= 0) {
-      setError('User ID must be a positive number');
-      setLoading(false);
-      return;
-    }
-
-    let metadata = {};
     try {
-      metadata = JSON.parse(formData.metadata);
-    } catch {
-      metadata = {};
+      let metadata = {};
+      try {
+        metadata = JSON.parse(formData.metadata);
+      } catch {
+        metadata = {};
+      }
+
+      // Payload oluştur
+      const payload: any = {
+        event_type: formData.event_type,
+        metadata,
+      };
+
+      // Eğer kullanıcı login olmuşsa user_id ekle
+      if (currentUser?.id) {
+        payload.user_id = currentUser.id;
+      }
+
+      await eventApi.create(payload);
+
+      setSuccess(true);
+      setFormData({ event_type: '', metadata: '{}' });
+    } catch (err: any) {
+      setError(err.response?.data?.detail || 'Something went wrong');
+    } finally {
+      setLoading(false);
     }
-
-    await eventApi.create({
-      event_type: formData.event_type,
-      user_id: userId,        // ← Artık garanti pozitif integer
-      metadata,
-    });
-
-    setSuccess(true);
-    setFormData({ event_type: '', user_id: '', metadata: '{}' });
-  } catch (err: any) {
-    setError(err.response?.data?.detail || 'Something went wrong');
-  } finally {
-    setLoading(false);
-  }
-};
+  };
 
   return (
     <div className="max-w-2xl">
-      <h2 className="text-2xl font-bold text-gray-900 mb-6">Create Event</h2>
+      <div className="flex items-center justify-between mb-6">
+        <h2 className="text-2xl font-bold text-gray-900">Create Event</h2>
+        {currentUser && (
+          <div className="flex items-center gap-2 px-3 py-1.5 bg-blue-50 text-blue-700 rounded-full text-sm">
+            <User className="w-4 h-4" />
+            <span>@{currentUser.username}</span>
+          </div>
+        )}
+      </div>
 
       {success && (
         <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg flex items-center gap-2 text-green-700">
           <CheckCircle className="w-5 h-5" />
           Event created successfully!
+          {currentUser && (
+            <span className="text-sm text-green-600 ml-1">
+              (as User #{currentUser.id})
+            </span>
+          )}
         </div>
       )}
 
       {error && (
         <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700">
           {error}
+        </div>
+      )}
+
+      {/* Anonim uyarısı */}
+      {!currentUser && (
+        <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg text-amber-700 text-sm">
+          You are not logged in. Event will be created anonymously.
         </div>
       )}
 
@@ -76,20 +125,6 @@ export default function CreateEvent() {
             value={formData.event_type}
             onChange={(e) => setFormData({ ...formData, event_type: e.target.value })}
             placeholder="e.g., user_login, task_created"
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none transition-all"
-            required
-          />
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            User ID
-          </label>
-          <input
-            type="number"
-            value={formData.user_id}
-            onChange={(e) => setFormData({ ...formData, user_id: e.target.value })}
-            placeholder="e.g., 1"
             className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none transition-all"
             required
           />
@@ -114,7 +149,7 @@ export default function CreateEvent() {
           className="w-full flex items-center justify-center gap-2 bg-primary-600 text-white py-3 rounded-lg hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium"
         >
           <Send className="w-4 h-4" />
-          {loading ? 'Creating...' : 'Create Event'}
+          {loading ? 'Creating...' : currentUser ? 'Send Event (Authenticated)' : 'Send Event (Anonymous)'}
         </button>
       </form>
     </div>

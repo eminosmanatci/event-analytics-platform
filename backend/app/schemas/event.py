@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from datetime import datetime
 from typing import Optional, Dict, Any
 
@@ -22,6 +22,35 @@ class EventResponse(BaseModel):
     
     class Config:
         from_attributes = True
+    
+    @field_validator('metadata', mode='before')
+    @classmethod
+    def parse_metadata(cls, v):
+        """SQLAlchemy JSON -> Python dict dönüşümü"""
+        if v is None:
+            return None
+        if isinstance(v, dict):
+            return v
+        # SQLAlchemy JSON objesi veya string gelirse
+        import json
+        if hasattr(v, 'val'):  # PostgreSQL JSON type
+            return v.val
+        if isinstance(v, str):
+            return json.loads(v)
+        return dict(v) if hasattr(v, '__iter__') else None
+    
+    @field_validator('timestamp', mode='before')
+    @classmethod
+    def parse_timestamp(cls, v):
+        """None veya string timestamp'ı handle et"""
+        if v is None:
+            return datetime.utcnow()
+        if isinstance(v, datetime):
+            return v
+        if isinstance(v, str):
+            from datetime import datetime as dt
+            return dt.fromisoformat(v.replace('Z', '+00:00'))
+        return v
 
 
 class EventCountResponse(BaseModel):

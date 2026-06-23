@@ -311,11 +311,11 @@ export default function Dashboard() {
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-muted-foreground">
                             <div className="flex items-center gap-2">
-                              <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center text-xs font-semibold text-primary">
-                                {event.user_id}
-                              </div>
-                              <span>User #{event.user_id}</span>
-                            </div>
+                             <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center text-xs font-semibold text-primary">
+                              {event.user_id ? event.user_id : 'G'}
+                             </div>
+                             <span>{event.user_id ? `User #${event.user_id}` : 'Guest'}</span>
+                             </div>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-muted-foreground">
                             <div className="flex items-center gap-1.5">

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { analyticsApi } from '../lib/api';
-import Layout from '../components/Layout'; // Layout importu eklendi
+import Layout from '../components/Layout';
 
 const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'];
 
@@ -21,7 +21,16 @@ export default function Analytics() {
         ]);
 
         setDailyEvents(dailyRes.data);
-        setEventTypes(typesRes.data);
+        
+        // --- GÜNCEL VERİ DÖNÜŞÜMÜ ---
+        // API'den gelen veriyi Recharts'ın beklediği name/value yapısına çeviriyoruz
+        const normalizedTypes = typesRes.data.map((item: any) => ({
+          name: item.type || item.event_type || 'Unknown', 
+          value: item.count,
+        }));
+        setEventTypes(normalizedTypes);
+        // -----------------------------
+
         setActiveUsers(usersRes.data);
       } catch (error) {
         console.error('Error fetching analytics:', error);
@@ -84,11 +93,12 @@ export default function Analytics() {
                     cx="50%"
                     cy="50%"
                     labelLine={false}
-                    label={({ event_type, percent }) => `${event_type} ${(percent * 100).toFixed(0)}%`}
+                    // Artık 'name' ve 'percent' parametreleri doğru şekilde eşleşecek
+                    label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
                     outerRadius={80}
                     fill="#8884d8"
-                    dataKey="count"
-                    nameKey="event_type"
+                    dataKey="value" 
+                    nameKey="name"
                   >
                     {eventTypes.map((_entry, index) => (
                       <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />

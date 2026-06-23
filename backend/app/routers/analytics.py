@@ -4,6 +4,7 @@ from sqlalchemy import func, desc
 from datetime import datetime, timedelta
 from typing import List, Optional
 
+from app.services.ai_service import generate_insights
 from app.core.database import get_db
 from app.core.security import get_current_user, get_current_user_optional
 from app.core.logging_config import logger
@@ -206,3 +207,50 @@ def get_summary(
     
     cache_result(cache_key, data, expire=60)  # 1 dakika cache
     return data
+
+@router.get("/ai-insights")
+@limiter.limit("5/minute") # AI isteklerini limitli tutmak önemli
+def get_ai_insights(
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_user_optional)
+):
+    """Groq LLaMA 3 ile Yapay Zeka Destekli Sistem Analizi"""
+    # Her girişte API'yi yormamak için 15 dakika cache'liyoruz
+    cache_key = get_cache_key("ai_insights_v1")
+    cached = get_cached_result(cache_key)
+    if cached:
+        logger.info("CACHE_HIT | ai-insights")
+        return {"insights": cached}
+        
+    # AI'a göndermek için veritabanından güncel durumu çekiyoruz
+    today = datetime.utcnow().date()
+    total_events = db.query(func.count(Event.id)).scalar()
+    todays_events = db.query(func.count(Event.id)).filter(func.date(Event.timestamp) == today).scalar()
+    active_users = db.query(func.count(func.distinct(Event.user_id))).scalar()
+    
+    # En çok tekrar eden top 5 event
+    results = (
+        db.query(Event.event_type, func.count(Event.id).label("count"))
+        .group_by(Event.event_type)
+        .order_by(desc("count"))
+        .limit(5)
+        .all()
+    )
+    top_events = {r.event_type: r.count for r in results}
+    
+    # AI'ın okuyacağı özet veri formatı
+    summary_data = {
+        "toplam_sistem_eventi": total_events,
+        "bugunku_event_sayisi": todays_events,
+        "toplam_aktif_kullanici": active_users,
+        "en_cok_tetiklenen_eventler": top_events
+    }
+    
+    # Groq API'sine gönder
+    insights_text = generate_insights(summary_data)
+    
+    # Sonucu Redis'e kaydet (15 dakika = 900 saniye)
+    cache_result(cache_key, insights_text, expire=900)
+    
+    return {"insights": insights_text}

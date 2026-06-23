@@ -7,7 +7,7 @@ services:
     container_name: event-analytics-db
     environment:
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres  # Buradaki şifre ile backend'deki aynı olmalı
+      POSTGRES_PASSWORD: postgres
       POSTGRES_DB: event_analytics
     volumes:
       - postgres_data:/var/lib/postgresql/data
@@ -19,22 +19,47 @@ services:
       timeout: 5s
       retries: 5
 
+  # Redis (Mesaj Kuyruğu ve Cache için)
+  redis:
+    image: redis:7-alpine
+    container_name: event-analytics-redis
+    ports:
+      - "6379:6379"
+
   # FastAPI Backend
   backend:
     build: ./backend
     container_name: event-analytics-backend
     environment:
       DATABASE_URL: postgresql://postgres:postgres@db:5432/event_analytics
+      REDIS_URL: redis://redis:6379/0
+      GROQ_API_KEY: ${GROQ_API_KEY}
       APP_NAME: Event Analytics Platform
       DEBUG: "True"
       API_V1_PREFIX: /api/v1
     volumes:
       - ./backend/app:/app/app
     ports:
-      - "8000:8000"  # Dışarıdan erişim için kritik
+      - "8000:8000"
     depends_on:
       db:
         condition: service_healthy
+      redis:
+        condition: service_started
+
+  # Celery Worker (Arka Plan İşçisi)
+  celery_worker:
+    build: ./backend
+    container_name: event-analytics-celery
+    command: celery -A app.worker.celery_app worker --loglevel=info
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@db:5432/event_analytics
+      REDIS_URL: redis://redis:6379/0
+    volumes:
+      - ./backend/app:/app/app
+    depends_on:
+      - db
+      - redis
 
   # React Frontend (Vite)
   frontend:

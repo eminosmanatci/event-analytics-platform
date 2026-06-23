@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
+import ReactMarkdown from 'react-markdown';
 import {
   MousePointer,
   Users,
@@ -12,6 +13,8 @@ import {
   Filter,
   ChevronLeft,
   ChevronRight,
+  Sparkles,
+  Bot
 } from 'lucide-react';
 import { analyticsApi, eventApi } from '../lib/api';
 import { StatCard } from '../components/StatCard';
@@ -38,7 +41,9 @@ export default function Dashboard() {
     todayEvents: 0,
   });
   const [recentEvents, setRecentEvents] = useState<Event[]>([]);
+  const [aiInsights, setAiInsights] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadingAi, setLoadingAi] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -76,11 +81,27 @@ export default function Dashboard() {
     }
   }, []);
 
+  const fetchAiInsights = useCallback(async () => {
+    try {
+      setLoadingAi(true);
+      const res = await analyticsApi.getAiInsights();
+      setAiInsights(res.data.insights);
+    } catch (error) {
+      console.error('Error fetching AI insights:', error);
+      setAiInsights('Yapay zeka analizi şu an kullanılamıyor.');
+    } finally {
+      setLoadingAi(false);
+    }
+  }, []);
+
   useEffect(() => {
     fetchData();
+    fetchAiInsights(); // İlk girişte AI verisini de çek
+    
+    // Sadece ana verileri periyodik yenile, AI verisini her 30 sn'de bir yenilemeye gerek yok (API limitleri için)
     const interval = setInterval(() => fetchData(false), 30000);
     return () => clearInterval(interval);
-  }, [fetchData]);
+  }, [fetchData, fetchAiInsights]);
 
   const filteredEvents = recentEvents.filter(event =>
     event.event_type.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -106,7 +127,7 @@ export default function Dashboard() {
   };
 
   return (
-    <Layout title="Dashboard Overview" onRefresh={() => fetchData(true)} refreshing={refreshing}>
+    <Layout title="Dashboard Overview" onRefresh={() => { fetchData(true); fetchAiInsights(); }} refreshing={refreshing}>
       <div className="space-y-6">
         {/* Stats Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -156,6 +177,40 @@ export default function Dashboard() {
             </>
           )}
         </div>
+
+        {/* AI Insights Panel */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.35 }}
+          className="bg-gradient-to-br from-primary/5 via-background to-background border border-primary/20 rounded-xl p-6 shadow-sm relative overflow-hidden"
+        >
+          <div className="absolute top-0 right-0 w-64 h-64 bg-primary/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 pointer-events-none" />
+          
+          <div className="flex items-center gap-2 mb-4 relative">
+            <div className="p-2 bg-primary/10 rounded-lg">
+              <Bot className="w-5 h-5 text-primary" />
+            </div>
+            <h3 className="text-lg font-semibold text-foreground flex items-center gap-2">
+              AI Platform Insights
+              <Sparkles className="w-4 h-4 text-primary animate-pulse" />
+            </h3>
+          </div>
+          
+          <div className="relative">
+            {loadingAi ? (
+              <div className="space-y-3 animate-pulse">
+                <div className="h-4 bg-muted rounded w-3/4"></div>
+                <div className="h-4 bg-muted rounded w-5/6"></div>
+                <div className="h-4 bg-muted rounded w-2/3"></div>
+              </div>
+            ) : (
+              <div className="prose prose-sm dark:prose-invert max-w-none text-muted-foreground">
+                <ReactMarkdown>{aiInsights || ''}</ReactMarkdown>
+              </div>
+            )}
+          </div>
+        </motion.div>
 
         {/* Charts */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

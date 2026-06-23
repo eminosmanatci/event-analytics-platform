@@ -1,7 +1,10 @@
+from datetime import datetime  # ← EKLENDİ
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import settings
+from app.core.rate_limit import setup_rate_limiting
+from app.core.logging_config import LogMiddleware, logger
 from app.routers import events, analytics, auth
 
 app = FastAPI(
@@ -12,15 +15,21 @@ app = FastAPI(
     redoc_url="/redoc"
 )
 
-# CORS ayarları - Tüm origin'lere izin ver (development için)
+# Rate limiting setup
+setup_rate_limiting(app)
+
+# Logging middleware
+app.add_middleware(LogMiddleware)
+
+# CORS ayarları
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "http://localhost:5173",
         "http://127.0.0.1:5173",
         "http://localhost:3000",
-        "http://frontend:5173",  # Docker container adı
-        "http://event-analytics-frontend:5173",  # Docker container adı
+        "http://frontend:5173",
+        "http://event-analytics-frontend:5173",
     ],
     allow_credentials=True,
     allow_methods=["*"],
@@ -38,10 +47,20 @@ def root():
     return {
         "message": "Event Analytics Platform API",
         "version": "1.0.0",
-        "docs": "/docs"
+        "docs": "/docs",
+        "features": ["rate_limiting", "caching", "background_tasks", "logging"]
     }
 
 
 @app.get("/health")
 def health_check():
-    return {"status": "healthy"}
+    return {
+        "status": "healthy",
+        "timestamp": datetime.utcnow().isoformat(),
+        "version": "1.0.0"
+    }
+
+
+@app.on_event("startup")
+async def startup_event():
+    logger.info("🚀 Event Analytics Platform API started")

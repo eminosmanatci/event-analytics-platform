@@ -1,47 +1,208 @@
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Request, HTTPException
 from sqlalchemy.orm import Session
-from typing import Optional
-from datetime import datetime
+from sqlalchemy import func, desc
+from datetime import datetime, timedelta
+from typing import List, Optional
 
 from app.core.database import get_db
-from app.services import analytics_service
-
-
-router = APIRouter(
-    prefix="/analytics",
-    tags=["analytics"],
-    responses={404: {"description": "Not found"}}
+from app.core.security import get_current_user, get_current_user_optional
+from app.core.logging_config import logger
+from app.core.rate_limit import limiter
+from app.models.event import Event
+from app.models.user import User
+from app.schemas.event import (
+    DailyEventCount,           # ← DailyEvents YERİNE
+    EventTypeDistribution,
+    ActiveUserStats,           # ← ActiveUsersStats YERİNE (tekil)
+    AnalyticsSummary
 )
+
+# Redis caching (opsiyonel)
+try:
+    import redis
+    redis_client = redis.Redis(host='redis', port=6379, db=0, decode_responses=True)
+    redis_client.ping()
+    REDIS_AVAILABLE = True
+except:
+    REDIS_AVAILABLE = False
+    redis_client = None
+
+router = APIRouter(prefix="/analytics", tags=["Analytics"])
+
+
+def get_cache_key(prefix: str, *args):
+    return f"analytics:{prefix}:{':'.join(str(a) for a in args)}"
+
+
+def cache_result(key: str, data: dict, expire: int = 300):
+    if REDIS_AVAILABLE:
+        import json
+        redis_client.setex(key, expire, json.dumps(data))
+
+
+def get_cached_result(key: str):
+    if REDIS_AVAILABLE:
+        import json
+        cached = redis_client.get(key)
+        if cached:
+            return json.loads(cached)
+    return None
 
 
 @router.get("/daily-events")
-def daily_events(
-    days: int = Query(30, ge=1, le=365, description="Kaç günlük veri"),
-    db: Session = Depends(get_db)
+@limiter.limit("30/minute")
+def get_daily_events(
+    request: Request,
+    days: int = 30,
+    db: Session = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_user_optional)
 ):
-    return analytics_service.get_daily_events(db, days=days)
+    """Günlük event sayıları (cache'li)"""
+    cache_key = get_cache_key("daily", days)
+    cached = get_cached_result(cache_key)
+    if cached:
+        logger.info(f"CACHE_HIT | daily-events | days={days}")
+        return cached
+    
+    since = datetime.utcnow() - timedelta(days=days)
+    
+    results = (
+        db.query(
+            func.date(Event.timestamp).label("date"),
+            func.count(Event.id).label("count")
+        )
+        .filter(Event.timestamp >= since)
+        .group_by(func.date(Event.timestamp))
+        .order_by(func.date(Event.timestamp))
+        .all()
+    )
+    
+    data = [{"date": str(r.date), "count": r.count} for r in results]
+    cache_result(cache_key, data)
+    
+    logger.info(f"ANALYTICS | daily-events | days={days} | records={len(data)}")
+    return data
 
 
 @router.get("/active-users")
-def active_users(
-    days: int = Query(7, ge=1, le=90, description="Kaç günlük periyot"),
-    db: Session = Depends(get_db)
+@limiter.limit("30/minute")
+def get_active_users(
+    request: Request,
+    days: int = 30,
+    db: Session = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_user_optional)
 ):
-    return analytics_service.get_active_users(db, days=days)
-
-
-@router.get("/event-count")
-def event_count(
-    event_type: Optional[str] = Query(None, description="Filtre: event tipi"),
-    start_date: Optional[datetime] = Query(None, description="Başlangıç tarihi (ISO format)"),
-    end_date: Optional[datetime] = Query(None, description="Bitiş tarihi (ISO format)"),
-    db: Session = Depends(get_db)
-):
-    return analytics_service.get_event_count(
-        db, event_type=event_type, start_date=start_date, end_date=end_date
+    """Aktif kullanıcı istatistikleri (cache'li)"""
+    cache_key = get_cache_key("active_users", days)
+    cached = get_cached_result(cache_key)
+    if cached:
+        return cached
+    
+    since = datetime.utcnow() - timedelta(days=days)
+    
+    daily_active = (
+        db.query(
+            func.date(Event.timestamp).label("date"),
+            func.count(func.distinct(Event.user_id)).label("active_users")
+        )
+        .filter(Event.timestamp >= since)
+        .group_by(func.date(Event.timestamp))
+        .order_by(func.date(Event.timestamp))
+        .all()
     )
+    
+    total_unique = (
+        db.query(func.count(func.distinct(Event.user_id)))
+        .filter(Event.timestamp >= since)
+        .scalar()
+    )
+    
+    data = {
+        "daily_active": [{"date": str(r.date), "count": r.active_users} for r in daily_active],
+        "total_unique": total_unique,
+        "period_days": days
+    }
+    
+    cache_result(cache_key, data)
+    return data
 
 
 @router.get("/event-types")
-def event_types(db: Session = Depends(get_db)):
-    return analytics_service.get_event_counts_by_type(db)
+@limiter.limit("30/minute")
+def get_event_types(
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_user_optional)
+):
+    """Event tipi dağılımı (cache'li)"""
+    cache_key = get_cache_key("types")
+    cached = get_cached_result(cache_key)
+    if cached:
+        return cached
+    
+    results = (
+        db.query(Event.event_type, func.count(Event.id).label("count"))
+        .group_by(Event.event_type)
+        .order_by(desc("count"))
+        .all()
+    )
+    
+    data = [{"type": r.event_type, "count": r.count} for r in results]
+    cache_result(cache_key, data)
+    return data
+
+
+@router.get("/event-count")
+@limiter.limit("30/minute")
+def get_event_count(
+    request: Request,
+    event_type: str = None,
+    db: Session = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_user_optional)
+):
+    """Belirli event tipinin sayısı"""
+    query = db.query(func.count(Event.id))
+    
+    if event_type:
+        query = query.filter(Event.event_type == event_type)
+    
+    count = query.scalar()
+    return {"count": count, "event_type": event_type or "all"}
+
+
+@router.get("/summary")
+@limiter.limit("30/minute")
+def get_summary(
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_user_optional)
+):
+    """Dashboard için özet istatistikler"""
+    cache_key = get_cache_key("summary")
+    cached = get_cached_result(cache_key)
+    if cached:
+        return cached
+    
+    today = datetime.utcnow().date()
+    
+    total_events = db.query(func.count(Event.id)).scalar()
+    
+    todays_events = (
+        db.query(func.count(Event.id))
+        .filter(func.date(Event.timestamp) == today)
+        .scalar()
+    )
+    
+    active_users = db.query(func.count(func.distinct(Event.user_id))).scalar()
+    
+    event_types_count = db.query(func.count(func.distinct(Event.event_type))).scalar()
+    
+    data = {
+        "total_events": total_events,
+        "active_users": active_users,
+        "event_types_count": event_types_count,
+        "todays_events": todays_events
+    }
+    
+    cache_result(cache_key, data, expire=60)  # 1 dakika cache
+    return data

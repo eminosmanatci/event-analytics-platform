@@ -1,6 +1,6 @@
 from pydantic import BaseModel, Field, field_validator
 from datetime import datetime
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 
 
 class EventBase(BaseModel):
@@ -16,6 +16,7 @@ class EventCreate(EventBase):
 class EventResponse(BaseModel):
     id: int
     user_id: Optional[int] = None
+    username: Optional[str] = None  # NEW: Kullanıcı adı (varsa)
     event_type: str
     timestamp: datetime
     metadata: Optional[Dict[str, Any]] = None
@@ -31,9 +32,8 @@ class EventResponse(BaseModel):
             return None
         if isinstance(v, dict):
             return v
-        # SQLAlchemy JSON objesi veya string gelirse
         import json
-        if hasattr(v, 'val'):  # PostgreSQL JSON type
+        if hasattr(v, 'val'):
             return v.val
         if isinstance(v, str):
             return json.loads(v)
@@ -56,3 +56,48 @@ class EventResponse(BaseModel):
 class EventCountResponse(BaseModel):
     event_type: str
     count: int
+
+
+# NEW: Event filtreleme için query params
+class EventFilter(BaseModel):
+    event_type: Optional[str] = None
+    user_id: Optional[int] = None
+    start_date: Optional[datetime] = None
+    end_date: Optional[datetime] = None
+    skip: int = 0
+    limit: int = 100
+
+
+# NEW: Dashboard istatistikleri
+class DashboardStats(BaseModel):
+    total_events: int
+    active_users: int
+    event_types_count: int
+    todays_events: int
+    period_change_percent: Optional[float] = None
+
+
+# NEW: Event tipi dağılımı (chart için)
+class EventTypeDistribution(BaseModel):
+    type: str
+    count: int
+    percentage: Optional[float] = None
+
+
+# NEW: Günlük event sayısı (line chart için)
+class DailyEventCount(BaseModel):
+    date: str
+    count: int
+
+
+# NEW: Aktif kullanıcı istatistikleri
+class ActiveUserStats(BaseModel):
+    date: str
+    count: int
+
+
+class AnalyticsSummary(BaseModel):
+    daily_events: List[DailyEventCount]
+    event_types: List[EventTypeDistribution]
+    active_users: List[ActiveUserStats]
+    total_unique_users: int
